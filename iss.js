@@ -17,10 +17,6 @@ const fetchMyIP = function (callback) {
   //step 2: find the URL for retrieving our IPv4 IP address in JSON format
 
   request("https://api.ipify.org/?format=json", (error, response, body) => {
-    // console.log("error: ", error);
-    // console.log("status code: ", response && response.statusCode);
-    // console.log("body: ", body);
-
     // inside the request callback ...
     // error can be set if invalid domain, user is offline, etc.
     if (error) return callback(error, null);
@@ -34,7 +30,7 @@ const fetchMyIP = function (callback) {
 
     //if we got here, then all is well and we got the data
     let ip = JSON.parse(body).ip;
-    callback(error, ip);
+    callback(null, ip);
   });
 };
 
@@ -65,12 +61,6 @@ const fetchCoordsByIP = function (ip, callback) {
     }
 
     // if we get here, all's well and we got the data
-
-    //   let data = {
-    //     latitude: JSON.parse(body).latitude,
-    //     longitude: JSON.parse(body).longitude,
-    //   };
-
     const { latitude, longitude } = JSON.parse(body);
 
     callback(null, { latitude, longitude });
@@ -109,4 +99,39 @@ const fetchISSFlyOverTimes = function (coordinates, callback) {
   );
 };
 
-module.exports = { fetchMyIP, fetchCoordsByIP, fetchISSFlyOverTimes };
+/**
+ * Orchestrates multiple API requests in order to determine the next 5 upcoming ISS fly overs for the user's current location.
+ * Input:
+ *   - A callback with an error or results.
+ * Returns (via Callback):
+ *   - An error, if any (nullable)
+ *   - The fly-over times as an array (null if error):
+ *     [ { risetime: <number>, duration: <number> }, ... ]
+ */
+const nextISSTimesForMyLocation = function (callback) {
+  fetchMyIP((error, ip) => {
+    if (error) {
+      return callback(error, null);
+    }
+
+    fetchCoordsByIP(ip, (error, loc) => {
+      if (error) {
+        return callback(error, null);
+      }
+
+      fetchISSFlyOverTimes(loc, (error, nextPasses) => {
+        if (error) {
+          return callback(error, null);
+        }
+
+        callback(null, nextPasses);
+      });
+    });
+  });
+};
+
+
+// Only export nextISSTimesForMyLocation and not the other three (API request) functions.
+// This is because they are not needed by external modules.
+
+module.exports = { nextISSTimesForMyLocation };
